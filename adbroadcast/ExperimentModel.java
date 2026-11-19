@@ -46,10 +46,10 @@ public class ExperimentModel {
         public int placed() { return nI + nQ + cI + cQ; }
         public int inSystem() { return arrived - placed() - expired - refused; }
         public double freePause() { return pauseTime - airtime; }
-        public double profit() { return revenue - AdModel.MINUTE_COST * freePause(); }
+        public double broadcastCost() { return AdModel.MINUTE_COST * Schedule.BROADCAST * (minutes / Schedule.DAY); }
+        public double profit() { return revenue - broadcastCost(); }
         public double profitPerYear() { return profit() / years(); }
-        public double paybackT() { return AdModel.Result.monthlyBroadcastCost() / profitPerYear(); }
-        public double paybackOneTime() { return AdModel.ONE_TIME_COST / profitPerYear(); }
+        public double paybackT() { return AdModel.ONE_TIME_COST / profitPerYear(); }
         public double meanWaiting() { return meanQueue + meanBlocked; }
     }
 

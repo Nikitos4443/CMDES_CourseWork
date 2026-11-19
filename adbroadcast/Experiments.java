@@ -31,7 +31,6 @@ public class Experiments {
             transientPeriod();
             replications();
             pauseSearch();
-            anova();
             demandSensitivity();
             proposals();
         } else {
@@ -70,7 +69,7 @@ public class Experiments {
             double[] edges = new double[bins + 1];
             for (int b = 1; b < bins; b++) edges[b] = erlangQuantile((double) b / bins);
             edges[bins] = Double.MAX_VALUE;
-            write(w, "erl(20;k=2)", x, 20, 20 / Math.sqrt(2), chi2(x, edges), bins - 1 - 0);
+            write(w, "erl(20;14.14)", x, 20, 20 / Math.sqrt(2), chi2(x, edges), bins - 1 - 0);
 
             Distribution uni = Distribution.unif(3, 0.5);
             for (int i = 0; i < count; i++) x[i] = uni.next();
@@ -139,7 +138,7 @@ public class Experiments {
             stRow(w, "V2", 1, 0.10, 20, 3, 240);
             stRow(w, "V3", 12, 0.10, 20, 3, 240);
             stRow(w, "V4", 6, 0.05, 20, 3, 240);
-            stRow(w, "V4a", 6, 0.15, 20, 3, 240);
+            stRow(w, "V4", 6, 0.15, 20, 3, 240);
             stRow(w, "V5", 6, 0.10, 10, 3, 240);
             stRow(w, "V6", 6, 0.10, 40, 3, 240);
             stRow(w, "V7", 6, 0.10, 20, 2, 240);
@@ -240,55 +239,14 @@ public class Experiments {
 
     static void pauseSearch() {
         try (PrintWriter w = csv("search.csv")) {
-            w.println("n,L,meanP,meanT,stdT,halfT,meanT1,immediate,cut,expired,free,meanWaiting,meanWaitPlaced");
+            w.println("n,L,meanP,meanT,stdT,halfT,immediate,cut,expired,free,meanWaiting,meanWaitPlaced");
             int[] extra = {36, 40, 48, 64, 96};
             for (int i = 1; i <= 32 + extra.length; i++) {
                 int n = i <= 32 ? i : extra[i - 33];
                 Series s = series(k -> new ExperimentModel.Config().pauses(n));
-                w.printf("%d,%.4f,%.2f,%.6f,%.7f,%.7f,%.6f,%.5f,%.5f,%.5f,%.5f,%.4f,%.3f%n",
-                        n, 96.0 / n, s.meanP, s.meanT, s.stdT, s.halfT, s.meanT1, s.immediate, s.cut, s.expired, s.free, s.waiting, s.waitPlaced);
+                w.printf("%d,%.4f,%.2f,%.6f,%.7f,%.7f,%.5f,%.5f,%.5f,%.5f,%.4f,%.3f%n",
+                        n, 96.0 / n, s.meanP, s.meanT, s.stdT, s.halfT, s.immediate, s.cut, s.expired, s.free, s.waiting, s.waitPlaced);
             }
-        }
-        try (PrintWriter w = csv("paired.csv")) {
-            w.println("nA,nB,meanDiff,stdDiff,t");
-            int[][] pairs = {{5, 4}, {5, 6}, {5, 7}, {5, 10}, {5, 14}};
-            for (int[] p : pairs) {
-                double[] d = new double[RUNS];
-                for (int k = 0; k < RUNS; k++) {
-                    FunRand.setSeed(BASE_SEED + k);
-                    double a = ExperimentModel.run(new ExperimentModel.Config().pauses(p[0]), RUN_TIME).paybackT();
-                    FunRand.setSeed(BASE_SEED + k);
-                    double b = ExperimentModel.run(new ExperimentModel.Config().pauses(p[1]), RUN_TIME).paybackT();
-                    d[k] = b - a;
-                }
-                double m = mean(d), sd = std(d, m);
-                w.printf("%d,%d,%.7f,%.7f,%.3f%n", p[0], p[1], m, sd, m / (sd / Math.sqrt(RUNS)));
-            }
-        }
-    }
-
-    static void anova() {
-        int[] levels = {3, 4, 5, 6, 7, 8};
-        double[][] y = new double[levels.length][RUNS];
-        double grand = 0;
-        for (int j = 0; j < levels.length; j++) {
-            for (int s = 0; s < RUNS; s++) {
-                FunRand.setSeed(BASE_SEED + s);
-                y[j][s] = ExperimentModel.run(new ExperimentModel.Config().pauses(levels[j]), RUN_TIME).paybackT();
-                grand += y[j][s];
-            }
-        }
-        grand /= levels.length * RUNS;
-        double ssF = 0, ssR = 0;
-        for (double[] row : y) {
-            double m = mean(row);
-            ssF += RUNS * (m - grand) * (m - grand);
-            for (double v : row) ssR += (v - m) * (v - m);
-        }
-        int dfF = levels.length - 1, dfR = levels.length * (RUNS - 1);
-        try (PrintWriter w = csv("anova.csv")) {
-            w.println("ssFactor,dfFactor,ssResidual,dfResidual,dFactor,dResidual,F");
-            w.printf("%.10f,%d,%.10f,%d,%.10f,%.12f,%.1f%n", ssF, dfF, ssR, dfR, ssF / dfF, ssR / dfR, (ssF / dfF) / (ssR / dfR));
         }
     }
 
@@ -358,7 +316,7 @@ public class Experiments {
     }
 
     static final class Series {
-        double meanP, meanT, stdT, halfT, meanT1, immediate, cut, expired, refused, free, waiting, waitPlaced;
+        double meanP, meanT, stdT, halfT, immediate, cut, expired, refused, free, waiting, waitPlaced;
     }
 
     static Series series(IntFunction<ExperimentModel.Config> factory) {
@@ -369,7 +327,6 @@ public class Experiments {
             ExperimentModel.Outcome o = ExperimentModel.run(factory.apply(k), RUN_TIME);
             t[k] = o.paybackT();
             s.meanP += o.profitPerYear() / RUNS;
-            s.meanT1 += o.paybackOneTime() / RUNS;
             s.immediate += (double) (o.nI() + o.cI()) / o.arrived() / RUNS;
             s.cut += o.placed() == 0 ? 0 : (double) (o.cI() + o.cQ()) / o.placed() / RUNS;
             s.expired += (double) o.expired() / o.arrived() / RUNS;

@@ -17,28 +17,27 @@ public class Main {
         printDetails(base);
 
         System.out.printf("%nЕксперимент: %d прогонів по %.0f р. для кожного n (спільні випадкові числа)%n", RUNS, YEARS);
-        System.out.println("  n |  L, хв | p, тис. грн/рік | T = s/p, роки (±95%) | 1e6/p, роки | відразу | обірв. | застар. | невикор. пауз");
+        System.out.println("  n |  L, хв | p, тис. грн/рік | T = c/p, роки (±95%) | відразу | обірв. | застар. | невикор. пауз");
         List<double[]> table = new ArrayList<>();
         int bestN = -1;
         double bestT = Double.MAX_VALUE;
         for (int n = 1; n <= MAX_PAUSES; n++) {
             double[] t = new double[RUNS];
-            double p = 0, alt = 0, imm = 0, cut = 0, exp = 0, free = 0;
+            double p = 0, imm = 0, cut = 0, exp = 0, free = 0;
             AdModel.Result r = null;
             for (int k = 0; k < RUNS; k++) {
                 FunRand.setSeed(1000 + k);
                 r = AdModel.run(n, SHARE, YEARS, false);
                 t[k] = r.paybackT();
                 p += r.profitPerYear() / RUNS;
-                alt += r.paybackOneTime() / RUNS;
                 imm += (double) (r.immediateFull() + r.immediateCut()) / r.arrived() / RUNS;
                 cut += (double) (r.immediateCut() + r.queuedCut()) / r.placed() / RUNS;
                 exp += (double) r.expired() / r.arrived() / RUNS;
                 free += r.freePauseTime() / r.pauseTime() / RUNS;
             }
             double mean = mean(t), half = 2.262 * std(t, mean) / Math.sqrt(RUNS);
-            System.out.printf("%3d | %6.2f | %15.1f | %8.5f ± %8.5f     | %11.5f | %6.1f%% | %5.1f%% | %6.1f%% | %8.1f%%%n",
-                    n, r.pauseLength(), p / 1000, mean, half, alt, imm * 100, cut * 100, exp * 100, free * 100);
+            System.out.printf("%3d | %6.2f | %15.1f | %8.5f ± %8.5f     | %6.1f%% | %5.1f%% | %6.1f%% | %8.1f%%%n",
+                    n, r.pauseLength(), p / 1000, mean, half, imm * 100, cut * 100, exp * 100, free * 100);
             if (mean < bestT) {
                 bestT = mean;
                 bestN = n;
@@ -61,10 +60,10 @@ public class Main {
                 r.arrived(), r.placed(), r.immediateFull(), r.queuedFull(), r.immediateCut(), r.queuedCut(), r.expired());
         System.out.printf("  середня довжина черги замовлень: %.3f; середнє очікування: %.1f хв%n", r.meanQueue(), r.meanWait());
         System.out.printf("  час пауз: %.0f хв, у т.ч. реклама %.0f хв, вільний %.0f хв%n", r.pauseTime(), r.airtime(), r.freePauseTime());
-        System.out.printf("  дохід від реклами: %.0f грн; оплата вільного часу пауз: %.0f грн%n",
-                r.revenue(), AdModel.MINUTE_COST * r.freePauseTime());
-        System.out.printf("  p = %.0f грн/рік; s = %.0f грн/міс; T = s/p = %.4f р.; 1 000 000/p = %.4f р.%n",
-                r.profitPerYear(), AdModel.Result.monthlyBroadcastCost(), r.paybackT(), r.paybackOneTime());
+        System.out.printf("  дохід від реклами: %.0f грн/рік; витрати на мовлення: %.0f грн/рік (у т.ч. вільний час пауз %.0f грн/рік)%n",
+                r.revenue() / r.years(), AdModel.Result.yearlyBroadcastCost(), AdModel.MINUTE_COST * r.freePauseTime() / r.years());
+        System.out.printf("  p = %.0f грн/рік; c = %.0f грн; T = c/p = %.4f р.%n",
+                r.profitPerYear(), AdModel.ONE_TIME_COST, r.paybackT());
     }
 
     private static double mean(double[] x) {

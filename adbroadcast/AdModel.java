@@ -4,7 +4,7 @@ import qnet.*;
 import qnet.Process;
 
 public class AdModel {
-    public static final double MINUTE_COST = 100;
+    public static final double MINUTE_COST = 10;
     public static final double ONE_TIME_COST = 1_000_000;
     public static final double WAIT_LIMIT = 4 * 60;
     public static final double DAYS_PER_YEAR = 365;
@@ -13,12 +13,12 @@ public class AdModel {
                          int arrived, int immediateFull, int queuedFull, int immediateCut, int queuedCut, int expired,
                          double revenue, double airtime, double pauseTime, double meanWait, double meanQueue) {
         public double freePauseTime() { return pauseTime - airtime; }
-        public double profitPerYear() { return (revenue - MINUTE_COST * freePauseTime()) / years; }
-        public static double monthlyBroadcastCost() {
-            return MINUTE_COST * Schedule.BROADCAST * DAYS_PER_YEAR / 12;
+
+        public static double yearlyBroadcastCost() {
+            return MINUTE_COST * Schedule.BROADCAST * DAYS_PER_YEAR;
         }
-        public double paybackT() { return monthlyBroadcastCost() / profitPerYear(); }
-        public double paybackOneTime() { return ONE_TIME_COST / profitPerYear(); }
+        public double profitPerYear() { return revenue / years - yearlyBroadcastCost(); }
+        public double paybackT() { return ONE_TIME_COST / profitPerYear(); }
         public int placed() { return immediateFull + queuedFull + immediateCut + queuedCut; }
     }
 
