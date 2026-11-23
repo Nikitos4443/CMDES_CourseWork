@@ -36,7 +36,7 @@ public class AdModel {
         Distribution adSize = Distribution.unif(3, 0.5);
         create.setEntityFactory(t -> new AdMessage(t, adSize.next()));
 
-        ImpatientProcess orders = new ImpatientProcess("ORDERS", Distribution.constant(0), WAIT_LIMIT);
+        Process orders = new Process("ORDERS", Distribution.constant(0));
         Process air = new Process("AIR", Distribution.constant(0));
         air.setMaxQueue(0);
         air.setServiceTime(e -> {
@@ -48,8 +48,11 @@ public class AdModel {
         Dispose expired = new Dispose("EXPIRED");
 
         create.to(orders);
-        orders.to(air).block(t -> pause.occupied() == 0 || air.occupied() > 0);
-        orders.setExpiredOutput(expired);
+        orders.to(expired).priority(2)
+                .block((t, e) -> t < e.getEnteredAt() + WAIT_LIMIT)           // B_Z: w < 240
+                .opensAt(e -> e.getEnteredAt() + WAIT_LIMIT);
+        orders.to(air).priority(1)
+                .block((t, e) -> pause.occupied() == 0 || air.occupied() > 0); // B_D
         air.to(payment);
 
         Model model = new Model(program, pause, create, orders, air, payment, expired);
@@ -59,7 +62,7 @@ public class AdModel {
 
         return new Result(pauses, schedule.pauseLength(), years,
                 create.getQuantity(), payment.immediateFull(), payment.queuedFull(),
-                payment.immediateCut(), payment.queuedCut(), orders.getExpired(),
+                payment.immediateCut(), payment.queuedCut(), expired.getQuantity(),
                 payment.revenue(), payment.airtime(), pause.busyTime(),
                 orders.meanWait(), orders.meanQueue(time));
     }

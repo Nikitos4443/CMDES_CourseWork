@@ -102,12 +102,12 @@ public class ExperimentModel {
         }
     }
 
-    static final class FitFirstOrders extends ImpatientProcess {
+    static final class FitFirstOrders extends Process {
         private final BooleanSupplier airOpen;
         private final DoubleSupplier pauseLeft;
 
-        FitFirstOrders(String name, double limit, BooleanSupplier airOpen, DoubleSupplier pauseLeft) {
-            super(name, Distribution.constant(0), limit);
+        FitFirstOrders(String name, BooleanSupplier airOpen, DoubleSupplier pauseLeft) {
+            super(name, Distribution.constant(0));
             this.airOpen = airOpen;
             this.pauseLeft = pauseLeft;
         }
@@ -129,6 +129,7 @@ public class ExperimentModel {
             Entity candidate = queue.remove(best);
             queue.addFirst(serving[0]);
             serving[0] = candidate;
+            updateTnext();
         }
 
         @Override
@@ -180,19 +181,23 @@ public class ExperimentModel {
             return ad.aired();
         });
 
-        ImpatientProcess orders = c.fitFirst
-                ? new FitFirstOrders("ORDERS", c.waitLimit,
+        Process orders = c.fitFirst
+                ? new FitFirstOrders("ORDERS",
                         () -> pause.occupied() > 0 && air.occupied() == 0,
                         () -> pause.getTnext() - pause.getTcurr())
-                : new ImpatientProcess("ORDERS", Distribution.constant(0), c.waitLimit);
+                : new Process("ORDERS", Distribution.constant(0));
         orders.setMaxQueue(c.maxQueue);
 
         TariffPayment payment = new TariffPayment("PAYMENT", c.queuedFactor, c.cutFactor, c.logAds);
         ExpiredOut expired = new ExpiredOut("EXPIRED", c.logAds);
 
         create.to(orders);
-        orders.to(air).block(t -> pause.occupied() == 0 || air.occupied() > 0);
-        orders.setExpiredOutput(expired);
+
+        orders.to(expired).priority(2)
+                .block((t, e) -> t < e.getEnteredAt() + c.waitLimit)           // B_Z: w < ліміту
+                .opensAt(e -> e.getEnteredAt() + c.waitLimit);
+        orders.to(air).priority(1)
+                .block((t, e) -> pause.occupied() == 0 || air.occupied() > 0); // B_D
         air.to(payment);
 
         Model model = new Model(program, pause, create, orders, air, payment, expired);
@@ -201,7 +206,7 @@ public class ExperimentModel {
 
         return new Outcome(minutes, create.getQuantity(),
                 payment.immediateFull(), payment.queuedFull(), payment.immediateCut(), payment.queuedCut(),
-                orders.getExpired(), orders.getFailures(),
+                expired.getQuantity(), orders.getFailures(),
                 payment.tariffRevenue, payment.airtime(), pause.busyTime(),
                 orders.meanQueue(minutes), orders.meanBlocked(minutes),
                 payment.wait.mean(), payment.wait.max());

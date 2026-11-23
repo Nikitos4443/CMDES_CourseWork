@@ -69,6 +69,15 @@ public class Process extends Element {
         for (int i = 0; i < channels; i++) {
             if (state[i] == BUSY && (c < 0 || channelEnd[i] < channelEnd[c])) c = i;
         }
+        if (c < 0 || channelEnd[c] > getTcurr()) {
+            for (int i = 0; i < channels; i++) {
+                if (state[i] == BLOCKED && opensAt(serving[i]) <= getTcurr()) {
+                    release(i);
+                    return;
+                }
+            }
+            return;
+        }
         state[c] = BLOCKED;
         channelEnd[c] = Double.MAX_VALUE;
         blockedSince[c] = getTcurr();
@@ -90,7 +99,7 @@ public class Process extends Element {
 
     private boolean release(int c) {
         Entity entity = serving[c];
-        Arc arc = route();
+        Arc arc = route(entity);
         if (arc == null) return false;
         quantity++;
         vacate(c);
@@ -134,7 +143,10 @@ public class Process extends Element {
 
     protected void updateTnext() {
         double min = Double.MAX_VALUE;
-        for (double t : channelEnd) min = Math.min(min, t);
+        for (int i = 0; i < channels; i++) {
+            min = Math.min(min, channelEnd[i]);
+            if (state[i] == BLOCKED) min = Math.min(min, opensAt(serving[i]));
+        }
         setTnext(min);
     }
 

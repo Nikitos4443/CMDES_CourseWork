@@ -37,7 +37,7 @@ public class Create extends Element {
             int type = typeProbabilities == null ? 0 : FunRand.choose(typeProbabilities) + 1;
             entity = new Entity(getTcurr(), type);
         }
-        Arc arc = route();
+        Arc arc = route(entity);
         if (arc == null) {
             lost++;
         } else {

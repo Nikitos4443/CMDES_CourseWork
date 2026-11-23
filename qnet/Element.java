@@ -47,7 +47,7 @@ public abstract class Element {
     public void doStatistics(double delta) {
     }
 
-    protected Arc route() {
+    protected Arc route(Entity entity) {
         if (arcs.isEmpty()) return Arc.EXIT;
         if (levels == null) levels = buildLevels();
 
@@ -57,7 +57,7 @@ public abstract class Element {
             Arc arc = level.size() == 1
                     ? level.getFirst()
                     : level.get(FunRand.choose(level.stream().mapToDouble(Arc::probability).toArray()));
-            if (arc.isBlocked(tcurr)) continue;
+            if (arc.isBlocked(tcurr, entity)) continue;
             if (byPriority && !arc.target().canAccept()) {
                 if (fallback == null) fallback = arc;
                 continue;
@@ -65,6 +65,12 @@ public abstract class Element {
             return arc;
         }
         return fallback;
+    }
+
+    protected double opensAt(Entity entity) {
+        double t = Double.MAX_VALUE;
+        for (Arc a : arcs) t = Math.min(t, a.opensAt(entity));
+        return t;
     }
 
     private List<List<Arc>> buildLevels() {
